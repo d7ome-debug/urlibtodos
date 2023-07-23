@@ -1,121 +1,6 @@
 from http.server import BaseHTTPRequestHandler, HTTPServer
 import urllib.parse as urlparse
 from urllib.parse import parse_qs
-
-todos = []
-
-class TodoHandler(BaseHTTPRequestHandler):
-    def do_GET(self):
-        self.send_response(200)
-        self.send_header('Content-type', 'text/html')
-        self.end_headers()
-        html = f"""
-        <!DOCTYPE html>
-        <html>
-            <head>
-                <title>To-Do List</title>
-            </head>
-            <body>
-                <h1>To-Do List</h1>
-                <ul>
-                    {''.join([f'<li>{todo}</li>' for todo in todos])}
-                </ul>
-                <form method="post">
-                    <input type="text" name="task">
-                    <input type="submit" value="Add Task">
-                </form>
-            </body>
-        </html>
-        """
-        self.wfile.write(html.encode())
-
-    def do_POST(self):
-        content_length = int(self.headers['Content-Length'])
-        post_data = self.rfile.read(content_length)
-        data = parse_qs(post_data.decode())
-        task = data['task'][0]
-        todos.append(task)
-        self.send_response(303)
-        self.send_header('Location', '/')
-        self.end_headers()
-
-def run(server_class=HTTPServer, handler_class=TodoHandler):
-    server_address = ('', 8000)
-    httpd = server_class(server_address, handler_class)
-    print('Starting httpd...')
-    httpd.serve_forever()
-
-if __name__ == '__main__':
-    run()
-v2-=-=
-from http.server import BaseHTTPRequestHandler, HTTPServer
-import urllib.parse as urlparse
-from urllib.parse import parse_qs
-
-todos = []
-
-class TodoHandler(BaseHTTPRequestHandler):
-    def do_GET(self):
-        parsed_path = urlparse.urlparse(self.path)
-        path = parsed_path.path
-        if path == '/':
-            self.send_response(200)
-            self.send_header('Content-type', 'text/html')
-            self.end_headers()
-            html = f"""
-            <!DOCTYPE html>
-            <html>
-                <head>
-                    <title>To-Do List</title>
-                </head>
-                <body>
-                    <h1>To-Do List</h1>
-                    <ul>
-                        {''.join([f'<li>{todo} <a href="/delete/{i}">Delete</a><a href="/complete/{i}">Complete</a></li>' for i, todo in enumerate(todos) if not todo.startswith('[DONE]')])}
-                    </ul>
-                    <form method="post">
-                        <input type="text" name="task">
-                        <input type="submit" value="Add Task">
-                    </form>
-                </body>
-            </html>
-            """
-            self.wfile.write(html.encode())
-        elif path.startswith('/delete/'):
-            index = int(path.split('/')[-1])
-            del todos[index]
-            self.send_response(303)
-            self.send_header('Location', '/')
-            self.end_headers()
-        elif path.startswith('/complete/'):
-            index = int(path.split('/')[-1])
-            todos[index] = '[DONE] ' + todos[index]
-            self.send_response(303)
-            self.send_header('Location', '/')
-            self.end_headers()
-
-    def do_POST(self):
-        content_length = int(self.headers['Content-Length'])
-        post_data = self.rfile.read(content_length)
-        data = parse_qs(post_data.decode())
-        task = data['task'][0]
-        todos.append(task)
-        self.send_response(303)
-        self.send_header('Location', '/')
-        self.end_headers()
-
-def run(server_class=HTTPServer, handler_class=TodoHandler):
-    server_address = ('', 8000)
-    httpd = server_class(server_address, handler_class)
-    print('Starting httpd...')
-    httpd.serve_forever()
-
-if __name__ == '__main__':
-    run()
-v3-=-=-=
-from http.server import BaseHTTPRequestHandler, HTTPServer
-import urllib.parse as urlparse
-from urllib.parse import parse_qs
 from datetime import datetime
 
 todos = []
@@ -133,6 +18,57 @@ class TodoHandler(BaseHTTPRequestHandler):
             <html>
                 <head>
                     <title>To-Do List</title>
+                    <style>
+                        body {{
+                            font-family: Arial, sans-serif;
+                            margin: 0;
+                            padding: 0;
+                            background-color: #add8e6;
+                        }}
+                        h1, h2 {{
+                            margin: 0;
+                            padding: 20px;
+                            background-color: #333;
+                            color: white;
+                        }}
+                        ul {{
+                            list-style: none;
+                            margin: 0;
+                            padding: 0;
+                        }}
+                        li {{
+                            padding: 20px;
+                            border-bottom: 1px solid #ddd;
+                        }}
+                        li:last-child {{
+                            border-bottom: none;
+                        }}
+                        form {{
+                            display: flex;
+                            margin: 20px;
+                        }}
+                        input[type="text"] {{
+                            flex-grow: 1;
+                            padding: 10px;
+                            margin-right: 10px;
+                        }}
+                        input[type="submit"] {{
+                            padding: 10px 20px;
+                        }}
+                        a {{
+                            display: inline-block;
+                            margin-left: 10px;
+                            padding: 5px 10px;
+                            text-decoration: none;
+                            color: white;
+                        }}
+                        a[href^="/delete"] {{
+                            background-color: #ff4136;
+                        }}
+                        a[href^="/complete"] {{
+                            background-color: #2ecc40;
+                        }}
+                    </style>
                 </head>
                 <body>
                     <h1>To-Do List</h1>
@@ -141,7 +77,7 @@ class TodoHandler(BaseHTTPRequestHandler):
                     </ul>
                     <h2>Completed Tasks</h2>
                     <ul>
-                        {''.join([f'<li>{todo[0]} (completed on {todo[1]})</li>' for todo in todos if isinstance(todo, tuple)])}
+                        {''.join([f'<li>{todo[0]} (completed on {todo[1]} at {todo[2]})</li>' for todo in todos if isinstance(todo, tuple)])}
                     </ul>
                     <form method="post">
                         <input type="text" name="task">
@@ -161,7 +97,8 @@ class TodoHandler(BaseHTTPRequestHandler):
             index = int(path.split('/')[-1])
             task = todos[index]
             date_completed = datetime.now().strftime('%Y-%m-%d')
-            todos[index] = (task, date_completed)
+            time_completed = datetime.now().strftime('%H:%M:%S')
+            todos[index] = (task, date_completed, time_completed)
             self.send_response(303)
             self.send_header('Location', '/')
             self.end_headers()
@@ -179,7 +116,7 @@ class TodoHandler(BaseHTTPRequestHandler):
 def run(server_class=HTTPServer, handler_class=TodoHandler):
     server_address = ('', 8000)
     httpd = server_class(server_address, handler_class)
-    print('Starting httpd...')
+    print('Starting httpd...\n ur http is ready\n http://localhost:8000')
     httpd.serve_forever()
 
 if __name__ == '__main__':
